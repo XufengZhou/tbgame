@@ -126,6 +126,15 @@ class Inform7Game:
 
     def gen_source_for_objects(self, objects: Iterable[WorldEntity]) -> str:
         source = ""
+        # TODO: 添加物品的take-drop分数
+        score_template = textwrap.dedent("""
+            After taking {objId}:
+                increase the score by {objScr}; 
+            
+            After dropping {objId}:
+                decrease the score by {objScr}; 
+                
+                """)
         for obj in objects:
             if obj.type in ["P", "I"]:
                 continue  # Skip player
@@ -157,6 +166,9 @@ class Inform7Game:
                             if word.lower() not in ["the", "of"]:
                                 source += 'Understand "{}" as {}.\n'.format(word, obj_infos.id)
 
+                # TODO: source中添加take-drop机制
+                source += score_template.format(objId=obj_infos.id, objScr=str(obj.score))
+
             # List object's attributes
             source += self.gen_source_for_attributes(obj.get_attributes())
 
@@ -173,7 +185,7 @@ class Inform7Game:
                 room_desc = room_infos.desc
                 source += "Understand \"{}\" as {}.\n".format(room_name, room.id)
                 source += "The internal name of {} is \"{}\".\n".format(room.id, room_name)
-                source += "The printed name of {} is \"-= {} =-\".\n".format(room.id, str.title(room_name))
+                # source += "The printed name of {} is \"-= {} =-\".\n".format(room.id, str.title(room_name))
                 # TODO: 在房间名称后添加player的名字
                 source += "The printed name of {} is \"-= {} =- [player\'s name]\".\n".format(room.id, str.title(room_name))
 

@@ -113,6 +113,10 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
     elif level >= 1:
         mode = "easy"
         options.nb_rooms = 5
+        # TODO: 添加其他物品
+        n_scoreobjs = np.round(np.linspace(2, 5, 10))
+        options.n_scoreobjs = int(n_scoreobjs[level - 1])
+
         quest_lengths = np.round(np.linspace(1, 5, 10))
         options.quest_length = int(quest_lengths[level - 1])
 
@@ -166,6 +170,9 @@ def make_game(mode: str, options: GameOptions) -> textworld.Game:
         options.chaining.create_variables = True
         options.chaining.allowed_types = ["k"]
 
+    # TODO: 添加分值物品数量
+    n_scoreobjs = options.n_scoreobjs
+
     # Generate map.
     map_ = textworld.generator.make_map(n_rooms=options.nb_rooms, rng=rng_map,
                                         possible_door_states=door_states)
@@ -200,6 +207,17 @@ def make_game(mode: str, options: GameOptions) -> textworld.Game:
     wrong_obj = Variable(var_id, obj_type)
     # Place it anywhere in the world.
     world.populate_with([wrong_obj], rng=rng_objects)
+
+    # Add object the player could pick up.
+    # TODO: 添加更多分值物品
+    types_counts = options.kb.types.count(world.state)
+    score_objects = []
+    obj_type = 'o'
+    for i in range(n_scoreobjs):
+        var_id = get_new(obj_type, types_counts)  # This update the types_counts.
+        score_objects.append(Variable(var_id, obj_type))
+    # Place score objects
+    world.populate_with(score_objects, rng=rng_objects)
 
     # Generate a quest that finishes by taking something (i.e. the right
     #  object since it's the only one in the inventory).

@@ -459,9 +459,11 @@ class Variable:
     A variable representing an object in a world.
     """
 
-    __slots__ = ("name", "type", "_hash")
+    # TODO: 添加score
+    __slots__ = ("name", "type", "score", "_hash")
 
-    def __init__(self, name: str, type: Optional[str] = None):
+    def __init__(self, name: str, type: Optional[str] = None,
+                 score: Optional[int] = None):
         """
         Create a Variable.
 
@@ -479,7 +481,9 @@ class Variable:
             type = name
         self.type = type
 
-        self._hash = hash((self.name, self.type))
+        # TODO: 直接在父类中添加score
+        self.score = score
+        self._hash = hash((self.name, self.type, self.score))
 
     def is_a(self, type: Type) -> bool:
         return type.has_subtype_named(self.type)
@@ -491,7 +495,8 @@ class Variable:
             return "{}: {}".format(self.name, self.type)
 
     def __repr__(self):
-        return "Variable({!r}, {!r})".format(self.name, self.type)
+        # TODO: 添加分数
+        return "Variable({!r}, {!r}, {!r})".format(self.name, self.type, self.score)
 
     def __eq__(self, other):
         if isinstance(other, Variable):

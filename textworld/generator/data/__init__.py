@@ -16,7 +16,8 @@ from textworld.utils import maybe_mkdir, RegexDict
 BUILTIN_DATA_PATH = os.path.dirname(__file__)
 LOGIC_DATA_PATH = pjoin(BUILTIN_DATA_PATH, 'logic')
 TEXT_GRAMMARS_PATH = pjoin(BUILTIN_DATA_PATH, 'text_grammars')
-
+# TODO: 添加json文件路径
+OBJECT_SCORE_PATH = pjoin(BUILTIN_DATA_PATH, 'object_score')
 
 def _maybe_copyfile(src, dest, force=False, verbose=False):
     if not os.path.isfile(dest) or force:

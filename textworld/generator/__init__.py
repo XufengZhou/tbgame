@@ -11,6 +11,8 @@ from typing import Optional, Mapping, Dict, Union
 
 from numpy.random import RandomState
 
+from collections import defaultdict
+
 from textworld import g_rng
 from textworld.utils import maybe_mkdir, str2bool
 from textworld.logic import State
@@ -25,6 +27,8 @@ from textworld.generator import inform7
 from textworld.generator.inform7 import generate_inform7_source, compile_inform7_game
 from textworld.generator.inform7 import CouldNotCompileGameError
 
+# TODO: 导入data模块
+from textworld.generator import data
 from textworld.generator.data import KnowledgeBase
 from textworld.generator.text_grammar import Grammar
 from textworld.generator.maker import GameMaker
@@ -159,6 +163,19 @@ def make_grammar(options: Mapping = {}, rng: Optional[RandomState] = None) -> Gr
     return grammar
 
 
+# TODO: 根据json设定分数
+def set_score_from_json(game):
+    with open(data.OBJECT_SCORE_PATH+'/obj_score.json') as score_file:
+        score_src = json.load(score_file)
+    score_dict = defaultdict(lambda: 0)
+    score_dict.update(score_src)
+    for obj in game.world.objects:
+        if obj.name in game.infos.keys():
+            obj.score = score_dict[game.infos[obj.name].name]
+        else:
+            obj.score = 0
+    return game
+
 def make_game_with(world, quests=None, grammar=None):
     game = Game(world, grammar, quests)
     if grammar is None:
@@ -166,6 +183,9 @@ def make_game_with(world, quests=None, grammar=None):
             var_infos.name = var.name
     else:
         game = generate_text_from_grammar(game, grammar)
+        # TODO: 根据名字生成分数
+        # str->int
+        game = set_score_from_json(game)
 
     return game
 

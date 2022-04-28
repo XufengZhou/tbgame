@@ -105,7 +105,9 @@ class WorldEntity(Variable):
         if var.type == "r":
             return WorldRoom(var.name, var.type)
 
-        return WorldObject(var.name, var.type)
+        # return WorldObject(var.name, var.type)
+        # TODO: 添加分数
+        return WorldObject(var.name, var.type, var.score)
 
     @property
     def id(self) -> str:
