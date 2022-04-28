@@ -60,6 +60,8 @@ class Inform7Game:
         self.entity_infos = self.game.infos
         self.kb = self.game.kb
         self.use_i7_description = False  # XXX: should it be removed?
+        # TODO: 规范化变量
+        self.players = self.game.players_entities
 
     def gen_source_for_map(self, src_room: WorldRoom) -> str:
         source = ""
@@ -172,6 +174,8 @@ class Inform7Game:
                 source += "Understand \"{}\" as {}.\n".format(room_name, room.id)
                 source += "The internal name of {} is \"{}\".\n".format(room.id, room_name)
                 source += "The printed name of {} is \"-= {} =-\".\n".format(room.id, str.title(room_name))
+                # TODO: 在房间名称后添加player的名字
+                source += "The printed name of {} is \"-= {} =- [player\'s name]\".\n".format(room.id, str.title(room_name))
 
                 parts = []
                 splits = re.split(r"\[end if\]", room_desc)
@@ -279,6 +283,9 @@ class Inform7Game:
         # Mention that rooms have a special text attribute called 'internal name'.
         source += "A room has a text called internal name.\n\n"
 
+        # TODO: 添加player's name
+        source += "The player\'s name is an indexed text that varies.\n"
+
         # Define custom addons.
         source += self.kb.inform7_addons_code + "\n"
 
@@ -308,8 +315,17 @@ class Inform7Game:
         source += self.gen_source_for_objects(self.game.world.objects)
         source += "\n\n"
 
-        # Place the player.
-        source += "The player is in {}.\n\n".format(self.entity_infos[self.game.world.player_room.id].id)
+        # # Place the player.
+        # source += "The player is in {}.\n\n".format(self.entity_infos[self.game.world.player_room.id].id)
+
+        # TODO: 添加多个player
+        for ply in self.players:
+            source += "{person} is in {room}. {person} is a person.The carrying capacity of {person} is {capacity}.\n".format(person=ply['name'],
+                                                                                                                              room='r_'+str(ply['room_id']),
+                                                                                                                              capacity=str(ply['capacity']))
+        source += 'The player is {p_name}. The player\'s name is "{p_name}".\n\n'.format(p_name=self.players[0]['name'])
+        # print(source)
+        # print()
 
         objective = self.game.objective.replace("\n", "[line break]")
         maximum_score = 0

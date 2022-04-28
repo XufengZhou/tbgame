@@ -399,8 +399,19 @@ class Game:
         self._objective = None
         self._infos = self._build_infos()
         self.kb = world.kb
-
+        # TODO zxf-start
+        self._players_entities = []  # zxf add player_entities
         self.change_grammar(grammar)
+        print()
+    @property
+    def players_entities(self) -> EntityInfo:
+        """ Information about the entities in the game. """
+        return self._players_entities
+
+    def add_player_entities(self, p):
+        for p_i in p:
+            self._players_entities.append(p_i)
+    # zxf -end
 
     @property
     def infos(self) -> Dict[str, EntityInfo]:
