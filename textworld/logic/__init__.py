@@ -1482,7 +1482,8 @@ class GameLogic:
     def load(cls, paths: Iterable[str]):
         result = cls()
         for path in paths:
-            with open(path, "r") as f:
+            # TODO:编码问题解决
+            with open(path, "r",  encoding="utf-8") as f:
                 result._parse(f.read(), path=path)
         result._initialize()
         return result
