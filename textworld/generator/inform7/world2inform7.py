@@ -330,9 +330,15 @@ class Inform7Game:
         # # Place the player.
         # source += "The player is in {}.\n\n".format(self.entity_infos[self.game.world.player_room.id].id)
 
+        # TODO: 添加注释
+        source += "[ 角色挂分数]\n[ 限制角色背包容量]\n"
+
         # TODO: 添加多个player
+        # TODO: 添加角色分数变量
         for ply in self.players:
-            source += "{person} is in {room}. {person} is a person.The carrying capacity of {person} is {capacity}.\n".format(person=ply['name'],
+            source += "{person} is in {room}. {person} is a person. \n" \
+                      "{person} has a number called pscore. \n" \
+                      "The carrying capacity of {person} is {capacity}.\n\n".format(person=ply['name'],
                                                                                                                               room='r_'+str(ply['room_id']),
                                                                                                                               capacity=str(ply['capacity']))
         source += 'The player is {p_name}. The player\'s name is "{p_name}".\n\n'.format(p_name=self.players[0]['name'])
@@ -415,14 +421,15 @@ class Inform7Game:
         # Remove square bracket when printing score increases. Square brackets are conflicting with
         # Inform7's events parser in tw_inform7.py.
         # And add winning conditions for the game.
+        # TODO: 修改分数显示以区分得分人
         source += textwrap.dedent("""\
         This is the simpler notify score changes rule:
             If the score is not the last notified score:
                 let V be the score - the last notified score;
                 if V > 0:
-                    say "Your score has just gone up by [V in words] ";
+                    say "The score of [player's name] has just gone up by [V in words] ";
                 else:
-                    say "Your score changed by [V in words] ";
+                    say "The score of [player's name] changed by [V in words] ";
                 if V >= -1 and V <= 1:
                     say "point.";
                 else:
@@ -491,6 +498,49 @@ class Inform7Game:
             say "[objective][line break]".
 
         """)  # noqa: W605
+
+        # TODO: 添加切换人物的命令
+        source += textwrap.dedent("""\
+        Changing is an action applying to nothing.
+        Understand "Exchange" and "change player" as Changing.
+        
+        Carry out Changing:
+            [ 世界广播位置及背包]
+            let R be the location of the player;
+            say "The location of [player's name] is: [the internal name of R][line break]";
+            say "The Inventory of [player's name] is:";
+            list the contents of the player, with newlines, indented, giving inventory information, including contents, with extra indentation;
+            say "Current score of [the player's name] is: [pscore of the player] [line break]";
+            say "[line break]";
+            [ 角色交换 ]
+            if the player is {PName1}: 
+                now the player is {PName2};
+                now the player's name is "{PName2}";
+            otherwise: 
+                now the player is {PName1};
+                now the player's name is "{PName1}";
+            say "Now is turn of [player's name]";
+ 
+
+        """.format(PName1=self.game.players_entities[0]['name'],
+                   PName2=self.game.players_entities[1]['name']))
+
+        # TODO: 添加每回合分数显示
+        source += textwrap.dedent("""\
+        Every turn: 
+            say "Current score of [the player's name] is: [pscore of the player]";
+
+        """)
+
+        # TODO: 添加中断游戏命令
+        source += textwrap.dedent("""\
+        Stoping is an action applying to nothing.
+        Understand "stop game" as Stoping.
+        
+        Carry out Stoping:
+            end the story;
+
+        """)
 
         # Simply display *** The End *** when game ends.
         source += textwrap.dedent("""\
