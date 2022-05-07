@@ -14,6 +14,7 @@ from textworld.generator.maker import ExitAlreadyUsedError
 from textworld.generator.maker import FailedConstraintsError
 from textworld.generator.maker import MissingPlayerError
 from textworld.generator.maker import PlayerAlreadySetError
+from textworld.challenges.tw_cooking import cookgame
 
 
 def _compile_game(game, folder):
@@ -77,7 +78,7 @@ def test_adding_the_same_object_multiple_times():
     container2 = M.new('c', name="another container")
     room.add(container1, container2)
 
-    obj = M.new('o')
+    obj = M.new('o'  )
     container1.add(obj)
     container2.add(obj)
     npt.assert_raises(FailedConstraintsError, M.validate)
@@ -114,12 +115,12 @@ def test_making_a_small_game(play_the_game=False):
 
     # Add a closed door between R1 and R2.
     door = M.new_door(path, name='glass door')
-    door.add_property("locked")
-
-    # Put a matching key for the door on R1's floor.
-    key = M.new(type='k', name='rusty key')
-    M.add_fact("match", key, door)
-    R1.add(key)
+    door.add_property("closed")
+    #
+    # # Put a matching key for the door on R1's floor.
+    # key = M.new(type='k', name='rusty key')
+    # M.add_fact("match", key, door)
+    # R1.add(key)
 
     # Add a closed chest in R2.
     chest = M.new(type='c', name='chest')
@@ -131,8 +132,21 @@ def test_making_a_small_game(play_the_game=False):
     chest.add(*objs)
 
     # Add 3 food objects in the player's inventory.
-    foods = [M.new(type='f') for _ in range(3)]
-    M.inventory.add(*foods)
+    foods_name = ['green apple', 'banana', 'apple', 'red apple', 'banana']
+    foods = []
+    for food in foods_name:
+        foods.append(M.new(type='f',name=food))
+    for i in range(2):
+        chest.add(foods[i])
+    # chest.add(*foods)
+
+    box = M.new(type='c', name='box')
+    box.add_property("open")
+    R1.add(box)
+    # box.add(*foods)
+    for i in range(2, 5):
+        box.add(foods[i])
+
 
     game = M.build()
     assert "GameMaker" in game.metadata["desc"]
@@ -199,5 +213,8 @@ def test_manually_defined_objective():
 
 
 if __name__ == "__main__":
-    # test_making_a_small_game(play_the_game=True)
-    test_record_quest_from_commands(play_the_game=True)
+    test_making_a_small_game(play_the_game=True)
+    # test_record_quest_from_commands(play_the_game=True)
+    # test_manually_defined_objective()
+    test_adding_the_same_object_multiple_times()
+

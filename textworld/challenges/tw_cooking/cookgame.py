@@ -293,7 +293,7 @@ FOODS_COMPACT = {
     "potato": {
         "names": ["red potato", "yellow potato", "purple potato"],
         "properties": ["inedible", "cookable", "needs_cooking", "cuttable", "uncut"],
-        "locations": ["kitchen.counter", "garden"],
+        "locations": ["kitchen.counter", "garden", "kitchen.fridge"],
     },
     "apple": {
         "names": ["red apple", "yellow apple", "green apple"],
@@ -658,9 +658,27 @@ def place_random_foods(M, nb_foods, rng, allowed_foods=FOODS):
             break
 
         entities += place_foods(M, [food], rng)
-
     return entities
 
+# zxf
+def get_more_foods(ingredinet_food: List[WorldEntity], distractor_food: List[WorldEntity]):
+    foods_name = []
+
+    for i in range(len(ingredinet_food)-1):
+        foods_name.append(ingredinet_food[i][0].name)
+
+    for food in distractor_food:
+        foods_name.append(food.name)
+
+    return foods_name
+
+
+def place_more_foods(M, foodlist, rng, food_times):
+    entities = []
+    for food in foodlist:
+        entities += place_foods(M, [food], rng)
+    return entities
+# zxf -e
 
 def place_entity(M, name, rng) -> WorldEntity:
     holder = pick_location(M, ENTITIES[name]["locations"], rng)
@@ -943,7 +961,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
     # Decide which ingredients are needed.
     nb_ingredients = settings.get("recipe", 1)
     assert nb_ingredients > 0 and nb_ingredients <= 5, "recipe must have {1,2,3,4,5} ingredients."
-    ingredient_foods = place_random_foods(M, nb_ingredients, rng_quest, allowed_foods)
+    ingredient_foods = place_random_foods(M, nb_ingredients, rng_quest, allowed_foods)  # 放置ingredient的食物，在这里方多份
 
     # Sort by name (to help differentiate unique recipes).
     ingredient_foods = sorted(ingredient_foods, key=lambda f: f.name)
@@ -978,7 +996,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         if nb_ingredients == 1 and settings.get("cut"):
             inventory_limit += 1  # So we can hold the knife along with the ingredient.
 
-    # Add distractors for each ingredient.
+    # Add distractors for each ingredient. 干扰项
     def _place_one_distractor(candidates, ingredient):
         rng_objects.shuffle(candidates)
         for food_name in candidates:
@@ -1022,7 +1040,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         assert settings.get("take", 0), "Shuffle recipe requires the 'take' skill."
         potential_ingredients = ingredient_foods + distractors
         rng_recipe.shuffle(potential_ingredients)
-        ingredient_foods = potential_ingredients[:nb_ingredients]
+        ingredient_foods = potential_ingredients[:nb_ingredients]  # 重置了一次可能的recipe
 
         # Decide on how the ingredients of the new recipe should be processed.
         ingredients = []
@@ -1041,6 +1059,12 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         M.add_fact(type_of_cooking, ingredient)
         M.add_fact("in", ingredient, recipe)
         M.nowhere.append(ingredient)
+
+    # 添加更多食物 zxf
+    rng_more_food = np.random.RandomState(2206)
+    more_foods_name = get_more_foods(ingredients, distractors)
+    print('All foods:\n', more_foods_name)
+    more_foods = place_more_foods(M, more_foods_name, rng_more_food, nb_ingredients)
 
     # Depending on the skills and how the ingredient should be processed
     # we change the predicates of the food objects accordingly.
@@ -1109,7 +1133,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
 
     G = compute_graph(M)  # Needed by the move(...) function called below.
 
-    # Build walkthrough.
+    # Build walkthrough.  TODO：walkthrough到底是啥？
     current_room = start_room
     walkthrough = []
 
