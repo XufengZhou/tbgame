@@ -20,7 +20,7 @@ def test_making_cooking_games():
     options.seeds = 1234
     options.file_ext = ".z8"
 
-    nb_ingredients = 1
+    nb_ingredients = 4
 
     settings = {
         "recipe": nb_ingredients,

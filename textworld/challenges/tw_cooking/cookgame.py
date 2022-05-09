@@ -576,6 +576,9 @@ DOORS = [
 ]
 
 
+ALL_LOCATIONS = ["kitchen.counter", "kitchen.table", "kitchen", "kitchen.fridge"]
+
+
 def pick_name(M, names, rng):
     names = list(names)
     rng.shuffle(names)
@@ -619,18 +622,25 @@ def pick_location(M, locations, rng):
 
 
 def place_food(M, name, rng, place_it=True):
-    holder = pick_location(M, FOODS[name]["locations"], rng)
-    if holder is None and place_it:
-        return None
+    if name[0:3] == 'new':
+        holder = pick_location(M, ALL_LOCATIONS, rng)
+        food = M.new(type="f", name=name)
+        food.infos.adj = ""
+        food.infos.noun = name
+    else:
+        holder = pick_location(M, FOODS[name]["locations"], rng)
 
-    food = M.new(type=FOODS[name].get("type", "f"), name=name)
-    food.infos.adj = ""
-    food.infos.noun = name
-    if "indefinite" in FOODS[name]:
-        food.infos.indefinite = FOODS[name]["indefinite"]
+        if holder is None and place_it:
+            return None
 
-    for property_ in FOODS[name]["properties"]:
-        food.add_property(property_)
+        food = M.new(type=FOODS[name].get("type", "f"), name=name)
+        food.infos.adj = ""
+        food.infos.noun = name
+        if "indefinite" in FOODS[name]:
+            food.infos.indefinite = FOODS[name]["indefinite"]
+
+        for property_ in FOODS[name]["properties"]:
+            food.add_property(property_)
 
     if place_it:
         holder.add(food)
@@ -665,12 +675,12 @@ def get_more_foods(ingredinet_food: List[WorldEntity], distractor_food: List[Wor
     foods_name = []
 
     for i in range(len(ingredinet_food)-1):
-        foods_name.append(ingredinet_food[i][0].name)
+        foods_name.append('new '+ingredinet_food[i].name)
 
     for food in distractor_food:
-        foods_name.append(food.name)
+        foods_name.append('new '+food.name)
 
-    return foods_name
+    return list(set(foods_name))
 
 
 def place_more_foods(M, foodlist, rng, food_times):
@@ -847,20 +857,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         options.kb = KnowledgeBase.load(logic_path=KB_LOGIC_PATH, grammar_path=KB_GRAMMAR_PATH)
 
     allowed_foods = list(FOODS)
-    allowed_food_preparations = get_food_preparations(list(FOODS))
-
-    if settings.get("cut"):
-        # If "cut" skill is specified, remove all "uncut" preparations.
-        for food, preparations in allowed_food_preparations.items():
-            allowed_food_preparations[food] = [preparation for preparation in preparations if "uncut" not in preparation]
-
-    if settings.get("cook"):
-        # If "cook" skill is specified, remove all "raw" preparations.
-        for food, preparations in list(allowed_food_preparations.items()):
-            allowed_food_preparations[food] = [preparation for preparation in preparations if "raw" not in preparation]
-            if len(allowed_food_preparations[food]) == 0:
-                del allowed_food_preparations[food]
-                allowed_foods.remove(food)
+    # allowed_food_preparations = get_food_preparations(list(FOODS))
 
     options = options or GameOptions()
 
@@ -917,7 +914,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
     M.add_fact("cooking_location", kitchen, recipe)
 
     # Place some default furnitures.
-    place_entities(M, ["table", "stove", "oven", "counter", "fridge", "BBQ", "shelf", "showcase"], rng_objects)
+    place_entities(M, ["table", "stove", "oven", "counter", "fridge"], rng_objects)
 
     # Place some random furnitures.
     nb_furnitures = rng_objects.randint(len(rooms), len(ENTITIES) + 1)
@@ -934,15 +931,6 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
 
     M.grammar = textworld.generator.make_grammar(options.grammar, rng=rng_grammar)
 
-    # Remove every food preparation with grilled, if there is no BBQ.
-    if M.find_by_name("BBQ") is None:
-        for name, food_preparations in allowed_food_preparations.items():
-            allowed_food_preparations[name] = [food_preparation for food_preparation in food_preparations
-                                               if "grilled" not in food_preparation]
-
-        # Disallow food with an empty preparation list.
-        allowed_foods = [name for name in allowed_foods if allowed_food_preparations[name]]
-
     # Decide which ingredients are needed.
     nb_ingredients = settings.get("recipe", 1)
     assert nb_ingredients > 0 and nb_ingredients <= 5, "recipe must have {1,2,3,4,5} ingredients."
@@ -950,22 +938,6 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
 
     # Sort by name (to help differentiate unique recipes).
     ingredient_foods = sorted(ingredient_foods, key=lambda f: f.name)
-
-    # Decide on how the ingredients should be processed.
-    ingredients = []
-    for i, food in enumerate(ingredient_foods):
-        food_preparations = allowed_food_preparations[food.name]
-        idx = rng_quest.randint(0, len(food_preparations))
-        type_of_cooking, type_of_cutting = food_preparations[idx]
-        ingredients.append((food, type_of_cooking, type_of_cutting))
-
-        # ingredient = M.new(type="ingredient", name="")
-        # food.add_property("ingredient_{}".format(i + 1))
-        # M.add_fact("base", food, ingredient)
-        # M.add_fact(type_of_cutting, ingredient)
-        # M.add_fact(type_of_cooking, ingredient)
-        # M.add_fact("in", ingredient, recipe)
-        # M.nowhere.append(ingredient)
 
     # Move ingredients in the player's inventory according to the `take` skill.
     nb_ingredients_already_in_inventory = nb_ingredients - settings.get("take", 0)
@@ -1030,18 +1002,13 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         # Decide on how the ingredients of the new recipe should be processed.
         ingredients = []
         for i, food in enumerate(ingredient_foods):
-            food_preparations = allowed_food_preparations[food.name]
-            idx = rng_recipe.randint(0, len(food_preparations))
-            type_of_cooking, type_of_cutting = food_preparations[idx]
-            ingredients.append((food, type_of_cooking, type_of_cutting))
+            ingredients.append(food)
 
     # Add necessary facts about the recipe.
-    for i, (food, type_of_cooking, type_of_cutting) in enumerate(ingredients):
+    for i, food in enumerate(ingredients):
         ingredient = M.new(type="ingredient", name="")
         food.add_property("ingredient_{}".format(i + 1))
         M.add_fact("base", food, ingredient)
-        M.add_fact(type_of_cutting, ingredient)
-        M.add_fact(type_of_cooking, ingredient)
         M.add_fact("in", ingredient, recipe)
         M.nowhere.append(ingredient)
 
@@ -1050,24 +1017,6 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
     more_foods_name = get_more_foods(ingredients, distractors)
     print('All foods:\n', more_foods_name)
     more_foods = place_more_foods(M, more_foods_name, rng_more_food, nb_ingredients)
-
-    # Depending on the skills and how the ingredient should be processed
-    # we change the predicates of the food objects accordingly.
-    for food, type_of_cooking, type_of_cutting in ingredients:
-        if not settings.get("cook"):  # Food should already be cooked accordingly.
-            food.add_property(type_of_cooking)
-            food.add_property("cooked")
-            if food.has_property("inedible"):
-                food.add_property("edible")
-                food.remove_property("inedible")
-            if food.has_property("raw"):
-                food.remove_property("raw")
-            if food.has_property("needs_cooking"):
-                food.remove_property("needs_cooking")
-
-        if not settings.get("cut"):  # Food should already be cut accordingly.
-            food.add_property(type_of_cutting)
-            food.remove_property("uncut")
 
     if not settings.get("open"):
         for entity in M._entities.values():
@@ -1216,30 +1165,15 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         """
         Recipe #1
         ---------
-        Gather all following ingredients and follow the directions to prepare this tasty meal.
+        Gather all following ingredients then you will win the game!
 
         Ingredients:
         {ingredients}
-
-        Directions:
-        {directions}
         """
     )
-    recipe_ingredients = "\n  ".join(ingredient[0].name for ingredient in ingredients)
+    recipe_ingredients = "\n  ".join(ingredient.name for ingredient in ingredients)
 
-    recipe_directions = []
-    for ingredient in ingredients:
-        cutting_verb = TYPES_OF_CUTTING_VERBS.get(ingredient[2])
-        if cutting_verb:
-            recipe_directions.append(cutting_verb + " the " + ingredient[0].name)
-
-        cooking_verb = TYPES_OF_COOKING_VERBS.get(ingredient[1])
-        if cooking_verb:
-            recipe_directions.append(cooking_verb + " the " + ingredient[0].name)
-
-    recipe_directions.append("prepare meal")
-    recipe_directions = "\n  ".join(recipe_directions)
-    recipe = recipe.format(ingredients=recipe_ingredients, directions=recipe_directions)
+    recipe = recipe.format(ingredients=recipe_ingredients)
     cookbook.infos.desc = cookbook_desc + recipe
 
     if settings.get("drop"):
@@ -1273,7 +1207,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         "seeds": options.seeds,
         "goal": cookbook.infos.desc,
         "recipe": recipe,
-        "ingredients": [(food.name, cooking, cutting) for food, cooking, cutting in ingredients],
+        "ingredients": [food.name for food in ingredients],
         "settings": settings,
         "entities": [e.name for e in M._entities.values() if e.name],
         "nb_distractors": nb_distractors,
