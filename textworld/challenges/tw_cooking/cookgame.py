@@ -848,21 +848,6 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
 
     allowed_foods = list(FOODS)
     allowed_food_preparations = get_food_preparations(list(FOODS))
-    if settings["split"] == "train":
-        allowed_foods = list(FOODS_SPLITS['train'])
-        allowed_food_preparations = dict(FOOD_PREPARATIONS_SPLITS['train'])
-    elif settings["split"] == "valid":
-        allowed_foods = list(FOODS_SPLITS['valid'])
-        allowed_food_preparations = get_food_preparations(FOODS_SPLITS['valid'])
-        # Also add food from the training set but with different preparations.
-        allowed_foods += [f for f in FOODS if f in FOODS_SPLITS['train']]
-        allowed_food_preparations.update(dict(FOOD_PREPARATIONS_SPLITS['valid']))
-    elif settings["split"] == "test":
-        allowed_foods = list(FOODS_SPLITS['test'])
-        allowed_food_preparations = get_food_preparations(FOODS_SPLITS['test'])
-        # Also add food from the training set but with different preparations.
-        allowed_foods += [f for f in FOODS if f in FOODS_SPLITS['train']]
-        allowed_food_preparations.update(dict(FOOD_PREPARATIONS_SPLITS['test']))
 
     if settings.get("cut"):
         # If "cut" skill is specified, remove all "uncut" preparations.
@@ -1090,141 +1075,141 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
                 entity.remove_property("closed")
                 entity.add_property("open")
 
-    walkthrough = []
-    # Build TextWorld quests.
-    quests = []
-    consumed_ingredient_events = []
-    for i, ingredient in enumerate(ingredients):
-        ingredient_consumed = Event(conditions={M.new_fact("consumed", ingredient[0])})
-        consumed_ingredient_events.append(ingredient_consumed)
-        ingredient_burned = Event(conditions={M.new_fact("burned", ingredient[0])})
-        quests.append(Quest(win_events=[], fail_events=[ingredient_burned]))
-
-        if ingredient[0] not in M.inventory:
-            holding_ingredient = Event(conditions={M.new_fact("in", ingredient[0], M.inventory)})
-            quests.append(Quest(win_events=[holding_ingredient]))
-
-        win_events = []
-        if ingredient[1] != TYPES_OF_COOKING[0] and not ingredient[0].has_property(ingredient[1]):
-            win_events += [Event(conditions={M.new_fact(ingredient[1], ingredient[0])})]
-
-        fail_events = [Event(conditions={M.new_fact(t, ingredient[0])})
-                       for t in set(TYPES_OF_COOKING[1:]) - {ingredient[1]}]  # Wrong cooking.
-
-        quests.append(Quest(win_events=win_events, fail_events=[ingredient_consumed] + fail_events))
-
-        win_events = []
-        if ingredient[2] != TYPES_OF_CUTTING[0] and not ingredient[0].has_property(ingredient[2]):
-            win_events += [Event(conditions={M.new_fact(ingredient[2], ingredient[0])})]
-
-        fail_events = [Event(conditions={M.new_fact(t, ingredient[0])})
-                       for t in set(TYPES_OF_CUTTING[1:]) - {ingredient[2]}]  # Wrong cutting.
-
-        quests.append(Quest(win_events=win_events, fail_events=[ingredient_consumed] + fail_events))
-
-    holding_meal = Event(conditions={M.new_fact("in", meal, M.inventory)})
-    quests.append(Quest(win_events=[holding_meal], fail_events=consumed_ingredient_events))
-
-    meal_burned = Event(conditions={M.new_fact("burned", meal)})
-    meal_consumed = Event(conditions={M.new_fact("consumed", meal)})
-    quests.append(Quest(win_events=[meal_consumed], fail_events=[meal_burned]))
-
-    M.quests = quests
-
-    G = compute_graph(M)  # Needed by the move(...) function called below.
-
-    # Build walkthrough.  TODO：walkthrough到底是啥？
-    current_room = start_room
-    walkthrough = []
-
-    # Start by checking the inventory.
-    walkthrough.append("inventory")
-
-    # 0. Find the kitchen and read the cookbook.
-    walkthrough += move(M, G, current_room, kitchen)
-    current_room = kitchen
-    walkthrough.append("examine cookbook")
-
-    # 1. Drop unneeded objects.
-    for entity in M.inventory.content:
-        if entity not in ingredient_foods:
-            walkthrough.append("drop {}".format(entity.name))
-
-    # 2. Collect the ingredients.
-    for food, type_of_cooking, type_of_cutting in ingredients:
-        if food.parent == M.inventory:
-            continue
-
-        food_room = food.parent.parent if food.parent.parent else food.parent
-        walkthrough += move(M, G, current_room, food_room)
-
-        if food.parent.has_property("closed"):
-            walkthrough.append("open {}".format(food.parent.name))
-
-        if food.parent == food_room:
-            walkthrough.append("take {}".format(food.name))
-        else:
-            walkthrough.append("take {} from {}".format(food.name, food.parent.name))
-
-        current_room = food_room
-
-    # 3. Go back to the kitchen.
-    walkthrough += move(M, G, current_room, kitchen)
-
-    # 4. Process ingredients (cook).
-    if settings.get("cook"):
-        for food, type_of_cooking, _ in ingredients:
-            if type_of_cooking == "fried":
-                stove = M.find_by_name("stove")
-                walkthrough.append("cook {} with {}".format(food.name, stove.name))
-            elif type_of_cooking == "roasted":
-                oven = M.find_by_name("oven")
-                walkthrough.append("cook {} with {}".format(food.name, oven.name))
-            elif type_of_cooking == "grilled":
-                toaster = M.find_by_name("BBQ")
-                # 3.a move to the backyard.
-                walkthrough += move(M, G, kitchen, toaster.parent)
-                # 3.b grill the food.
-                walkthrough.append("cook {} with {}".format(food.name, toaster.name))
-                # 3.c move back to the kitchen.
-                walkthrough += move(M, G, toaster.parent, kitchen)
-
-    # 5. Process ingredients (cut).
-    if settings.get("cut"):
-        free_up_space = settings.get("drop") and not len(ingredients) == 1
-        knife = M.find_by_name("knife")
-        if knife:
-            knife_location = knife.parent.name
-            knife_on_the_floor = knife_location == "kitchen"
-            for i, (food, _, type_of_cutting) in enumerate(ingredients):
-                if type_of_cutting == "uncut":
-                    continue
-
-                if free_up_space:
-                    ingredient_to_drop = ingredients[(i + 1) % len(ingredients)][0]
-                    walkthrough.append("drop {}".format(ingredient_to_drop.name))
-
-                # Assume knife is reachable.
-                if knife_on_the_floor:
-                    walkthrough.append("take {}".format(knife.name))
-                else:
-                    walkthrough.append("take {} from {}".format(knife.name, knife_location))
-
-                if type_of_cutting == "chopped":
-                    walkthrough.append("chop {} with {}".format(food.name, knife.name))
-                elif type_of_cutting == "sliced":
-                    walkthrough.append("slice {} with {}".format(food.name, knife.name))
-                elif type_of_cutting == "diced":
-                    walkthrough.append("dice {} with {}".format(food.name, knife.name))
-
-                walkthrough.append("drop {}".format(knife.name))
-                knife_on_the_floor = True
-                if free_up_space:
-                    walkthrough.append("take {}".format(ingredient_to_drop.name))
-
-    # 6. Prepare and eat meal.
-    walkthrough.append("prepare meal")
-    walkthrough.append("eat meal")
+    # walkthrough = []
+    # # Build TextWorld quests.
+    # quests = []
+    # consumed_ingredient_events = []
+    # for i, ingredient in enumerate(ingredients):
+    #     ingredient_consumed = Event(conditions={M.new_fact("consumed", ingredient[0])})
+    #     consumed_ingredient_events.append(ingredient_consumed)
+    #     ingredient_burned = Event(conditions={M.new_fact("burned", ingredient[0])})
+    #     quests.append(Quest(win_events=[], fail_events=[ingredient_burned]))
+    #
+    #     if ingredient[0] not in M.inventory:
+    #         holding_ingredient = Event(conditions={M.new_fact("in", ingredient[0], M.inventory)})
+    #         quests.append(Quest(win_events=[holding_ingredient]))
+    #
+    #     win_events = []
+    #     if ingredient[1] != TYPES_OF_COOKING[0] and not ingredient[0].has_property(ingredient[1]):
+    #         win_events += [Event(conditions={M.new_fact(ingredient[1], ingredient[0])})]
+    #
+    #     fail_events = [Event(conditions={M.new_fact(t, ingredient[0])})
+    #                    for t in set(TYPES_OF_COOKING[1:]) - {ingredient[1]}]  # Wrong cooking.
+    #
+    #     quests.append(Quest(win_events=win_events, fail_events=[ingredient_consumed] + fail_events))
+    #
+    #     win_events = []
+    #     if ingredient[2] != TYPES_OF_CUTTING[0] and not ingredient[0].has_property(ingredient[2]):
+    #         win_events += [Event(conditions={M.new_fact(ingredient[2], ingredient[0])})]
+    #
+    #     fail_events = [Event(conditions={M.new_fact(t, ingredient[0])})
+    #                    for t in set(TYPES_OF_CUTTING[1:]) - {ingredient[2]}]  # Wrong cutting.
+    #
+    #     quests.append(Quest(win_events=win_events, fail_events=[ingredient_consumed] + fail_events))
+    #
+    # holding_meal = Event(conditions={M.new_fact("in", meal, M.inventory)})
+    # quests.append(Quest(win_events=[holding_meal], fail_events=consumed_ingredient_events))
+    #
+    # meal_burned = Event(conditions={M.new_fact("burned", meal)})
+    # meal_consumed = Event(conditions={M.new_fact("consumed", meal)})
+    # quests.append(Quest(win_events=[meal_consumed], fail_events=[meal_burned]))
+    #
+    # M.quests = quests
+    #
+    # G = compute_graph(M)  # Needed by the move(...) function called below.
+    #
+    # # Build walkthrough.  TODO：walkthrough到底是啥？
+    # current_room = start_room
+    # walkthrough = []
+    #
+    # # Start by checking the inventory.
+    # walkthrough.append("inventory")
+    #
+    # # 0. Find the kitchen and read the cookbook.
+    # walkthrough += move(M, G, current_room, kitchen)
+    # current_room = kitchen
+    # walkthrough.append("examine cookbook")
+    #
+    # # 1. Drop unneeded objects.
+    # for entity in M.inventory.content:
+    #     if entity not in ingredient_foods:
+    #         walkthrough.append("drop {}".format(entity.name))
+    #
+    # # 2. Collect the ingredients.
+    # for food, type_of_cooking, type_of_cutting in ingredients:
+    #     if food.parent == M.inventory:
+    #         continue
+    #
+    #     food_room = food.parent.parent if food.parent.parent else food.parent
+    #     walkthrough += move(M, G, current_room, food_room)
+    #
+    #     if food.parent.has_property("closed"):
+    #         walkthrough.append("open {}".format(food.parent.name))
+    #
+    #     if food.parent == food_room:
+    #         walkthrough.append("take {}".format(food.name))
+    #     else:
+    #         walkthrough.append("take {} from {}".format(food.name, food.parent.name))
+    #
+    #     current_room = food_room
+    #
+    # # 3. Go back to the kitchen.
+    # walkthrough += move(M, G, current_room, kitchen)
+    #
+    # # 4. Process ingredients (cook).
+    # if settings.get("cook"):
+    #     for food, type_of_cooking, _ in ingredients:
+    #         if type_of_cooking == "fried":
+    #             stove = M.find_by_name("stove")
+    #             walkthrough.append("cook {} with {}".format(food.name, stove.name))
+    #         elif type_of_cooking == "roasted":
+    #             oven = M.find_by_name("oven")
+    #             walkthrough.append("cook {} with {}".format(food.name, oven.name))
+    #         elif type_of_cooking == "grilled":
+    #             toaster = M.find_by_name("BBQ")
+    #             # 3.a move to the backyard.
+    #             walkthrough += move(M, G, kitchen, toaster.parent)
+    #             # 3.b grill the food.
+    #             walkthrough.append("cook {} with {}".format(food.name, toaster.name))
+    #             # 3.c move back to the kitchen.
+    #             walkthrough += move(M, G, toaster.parent, kitchen)
+    #
+    # # 5. Process ingredients (cut).
+    # if settings.get("cut"):
+    #     free_up_space = settings.get("drop") and not len(ingredients) == 1
+    #     knife = M.find_by_name("knife")
+    #     if knife:
+    #         knife_location = knife.parent.name
+    #         knife_on_the_floor = knife_location == "kitchen"
+    #         for i, (food, _, type_of_cutting) in enumerate(ingredients):
+    #             if type_of_cutting == "uncut":
+    #                 continue
+    #
+    #             if free_up_space:
+    #                 ingredient_to_drop = ingredients[(i + 1) % len(ingredients)][0]
+    #                 walkthrough.append("drop {}".format(ingredient_to_drop.name))
+    #
+    #             # Assume knife is reachable.
+    #             if knife_on_the_floor:
+    #                 walkthrough.append("take {}".format(knife.name))
+    #             else:
+    #                 walkthrough.append("take {} from {}".format(knife.name, knife_location))
+    #
+    #             if type_of_cutting == "chopped":
+    #                 walkthrough.append("chop {} with {}".format(food.name, knife.name))
+    #             elif type_of_cutting == "sliced":
+    #                 walkthrough.append("slice {} with {}".format(food.name, knife.name))
+    #             elif type_of_cutting == "diced":
+    #                 walkthrough.append("dice {} with {}".format(food.name, knife.name))
+    #
+    #             walkthrough.append("drop {}".format(knife.name))
+    #             knife_on_the_floor = True
+    #             if free_up_space:
+    #                 walkthrough.append("take {}".format(ingredient_to_drop.name))
+    #
+    # # 6. Prepare and eat meal.
+    # walkthrough.append("prepare meal")
+    # walkthrough.append("eat meal")
 
     cookbook_desc = "You open the copy of 'Cooking: A Modern Approach (3rd Ed.)' and start reading:\n"
     recipe = textwrap.dedent(
@@ -1276,10 +1261,10 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
                     or entity.has_property("locked")):
                 raise ValueError("Forgot to add closed/locked/open property for '{}'.".format(entity.name))
 
-    if not settings.get("drop"):
-        M.set_walkthrough(walkthrough)
-    else:
-        pass  # BUG: With `--drop` having several "slots" causes issues with dependency tree.
+    # if not settings.get("drop"):
+    #     M.set_walkthrough(walkthrough)
+    # else:
+    #     pass  # BUG: With `--drop` having several "slots" causes issues with dependency tree.
 
     game = M.build()
 
@@ -1292,7 +1277,6 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
         "settings": settings,
         "entities": [e.name for e in M._entities.values() if e.name],
         "nb_distractors": nb_distractors,
-        "walkthrough": walkthrough,
         "max_score": sum(quest.reward for quest in game.quests),
     }
 

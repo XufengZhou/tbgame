@@ -116,7 +116,7 @@ def test_making_a_small_game(play_the_game=False):
     # Add a closed door between R1 and R2.
     door = M.new_door(path, name='glass door')
     door.add_property("closed")
-    #
+
     # # Put a matching key for the door on R1's floor.
     # key = M.new(type='k', name='rusty key')
     # M.add_fact("match", key, door)
@@ -161,9 +161,6 @@ def test_making_a_small_game(play_the_game=False):
 def test_record_quest_from_commands(play_the_game=False):
     M = GameMaker()
 
-    # The goal
-    commands = ["go east", "insert ball into chest"]
-
     # Create a 'bedroom' room.
     R1 = M.new_room("bedroom")
     R2 = M.new_room("kitchen")
@@ -180,6 +177,10 @@ def test_record_quest_from_commands(play_the_game=False):
     chest = M.new(type='c', name='chest')
     chest.add_property("open")
     R2.add(chest)
+
+
+    # The goal for win the game
+    commands = ["go east", "insert ball into chest"]
 
     M.set_quest_from_commands(commands)
     game = M.build()
@@ -213,8 +214,8 @@ def test_manually_defined_objective():
 
 
 if __name__ == "__main__":
-    test_making_a_small_game(play_the_game=True)
-    # test_record_quest_from_commands(play_the_game=True)
+    # test_making_a_small_game(play_the_game=True)
+    test_record_quest_from_commands(play_the_game=True)
     # test_manually_defined_objective()
-    test_adding_the_same_object_multiple_times()
+    # test_adding_the_same_object_multiple_times()
 

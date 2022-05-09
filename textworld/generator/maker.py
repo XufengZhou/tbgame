@@ -656,7 +656,7 @@ class GameMaker:
                 agent = textworld.agents.WalkthroughAgent(commands)
                 textworld.play(game_file, agent=agent, wrappers=[recorder], silent=True)
             except textworld.agents.WalkthroughDone:
-                pass  # Quest is done.
+                pass  # Quest is done.6++
 
         # Skip "None" actions.
         actions = [action for action in recorder.actions if action is not None]
