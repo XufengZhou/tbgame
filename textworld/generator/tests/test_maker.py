@@ -170,8 +170,11 @@ def test_record_quest_from_commands(play_the_game=False):
     path.door = M.new(type='d', name='wooden door')
     path.door.add_property("open")
 
-    ball = M.new(type='o', name='ball')
+    ball = M.new(type='o', name='new red banana')
     M.inventory.add(ball)
+    #
+    # ball2 = M.new(type='o', name='red banana')
+    # M.inventory.add(ball2)
 
     # Add a closed chest in R2.
     chest = M.new(type='c', name='chest')
@@ -180,7 +183,7 @@ def test_record_quest_from_commands(play_the_game=False):
 
 
     # The goal for win the game
-    commands = ["go east", "insert ball into chest"]
+    commands = ["go east", "insert banana into chest"]
 
     M.set_quest_from_commands(commands)
     game = M.build()

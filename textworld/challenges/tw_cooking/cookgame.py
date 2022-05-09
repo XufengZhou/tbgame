@@ -990,7 +990,7 @@ def make(settings: Mapping[str, str], options: Optional[GameOptions] = None) -> 
 
     # Add distractors foods. The amount is drawn from N(nb_ingredients, 3).
     nb_distractors = abs(int(rng_objects.randn(1) * 3 + nb_ingredients))
-    distractors = place_random_foods(M, nb_distractors, rng_objects, allowed_foods)
+    distractors = place_random_foods(M, len(allowed_foods), rng_objects, allowed_foods)
 
     # If recipe_seed is positive, a new recipe is sampled.
     if settings["recipe_seed"] > 0:
