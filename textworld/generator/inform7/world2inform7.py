@@ -351,7 +351,7 @@ class Inform7Game:
         # print(source)
         # print()
 
-        # TODO: 添加物品take-drop机制
+        # TODO: 添加物品take-drop机制, 包括所有物品
         source += textwrap.dedent("""\
         After taking something: 
             increase pscore of the player by the obscore;
