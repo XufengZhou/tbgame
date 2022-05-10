@@ -126,15 +126,15 @@ class Inform7Game:
 
     def gen_source_for_objects(self, objects: Iterable[WorldEntity]) -> str:
         source = ""
-        # TODO: 添加物品的take-drop分数
-        score_template = textwrap.dedent("""
-            After taking {objId}:
-                increase the score by {objScr}; 
-            
-            After dropping {objId}:
-                decrease the score by {objScr}; 
-                
-                """)
+        # # TODO: 添加物品的take-drop分数
+        # score_template = textwrap.dedent("""
+        #     After taking {objId}:
+        #         increase the score by {objScr};
+        #
+        #     After dropping {objId}:
+        #         decrease the score by {objScr};
+        #
+        #         """)
         for obj in objects:
             if obj.type in ["P", "I"]:
                 continue  # Skip player
@@ -144,6 +144,8 @@ class Inform7Game:
                 # Describe the object.
                 source += 'The description of {} is "{}".\n'.format(obj_infos.id, obj_infos.desc.replace("\n", "[line break]"))
                 source += 'The printed name of {} is "{}".\n'.format(obj_infos.id, obj_infos.name)
+                # TODO: 给物品绑定分数
+                source += 'The obscore of {} is {}.\n'.format(obj_infos.id, str(obj.score))
 
                 if obj_infos.indefinite:
                     source += 'The indefinite article of {} is "{}".\n'.format(obj_infos.id, obj_infos.indefinite)
@@ -166,8 +168,8 @@ class Inform7Game:
                             if word.lower() not in ["the", "of"]:
                                 source += 'Understand "{}" as {}.\n'.format(word, obj_infos.id)
 
-                # TODO: source中添加take-drop机制
-                source += score_template.format(objId=obj_infos.id, objScr=str(obj.score))
+                # # TODO: source中添加take-drop机制
+                # source += score_template.format(objId=obj_infos.id, objScr=str(obj.score))
 
             # List object's attributes
             source += self.gen_source_for_attributes(obj.get_attributes())
@@ -292,6 +294,9 @@ class Inform7Game:
         source += "Use MAX_STATIC_DATA of 500000.\n"  # To generate game with 300+ locations.
         source += "When play begins, seed the random-number generator with {}.\n\n".format(seed)
         source += self.define_inform7_kinds()
+        # TODO: 给物体添加分数值
+        source += 'object-like has a number called obscore.\n'
+
         # Mention that rooms have a special text attribute called 'internal name'.
         source += "A room has a text called internal name.\n\n"
 
@@ -299,7 +304,8 @@ class Inform7Game:
         source += "The player\'s name is an indexed text that varies.\n"
 
         # Define custom addons.
-        source += self.kb.inform7_addons_code + "\n"
+        # TODO: 此处添加了carrying capacity, 暂时先注释掉
+        # source += self.kb.inform7_addons_code + "\n"
 
         # Declare all rooms.
         room_names = [room.id for room in self.game.world.rooms]
@@ -344,6 +350,16 @@ class Inform7Game:
         source += 'The player is {p_name}. The player\'s name is "{p_name}".\n\n'.format(p_name=self.players[0]['name'])
         # print(source)
         # print()
+
+        # TODO: 添加物品take-drop机制
+        source += textwrap.dedent("""\
+        After taking something: 
+            increase pscore of the player by the obscore;
+        After dropping something: 
+            decrease pscore of the player by the obscore of the noun; 
+
+        """)
+
 
         objective = self.game.objective.replace("\n", "[line break]")
         maximum_score = 0
@@ -652,12 +668,13 @@ class Inform7Game:
         """)
 
         # Useful for listing things laying on the floor.
+        # TODO: 修改yourself为the player, 避免run-time problem P50
         source += textwrap.dedent("""\
         Printing the things on the floor is an activity.
         Rule for printing the things on the floor:
             let R be the location of the player;
             let L be the list of things in R;
-            remove yourself from L;
+            remove the player from L;
             remove the list of containers from L;
             remove the list of supporters from L;
             remove the list of doors from L;
@@ -1084,7 +1101,8 @@ def compile_inform7_game(source: str, output: str, verbose: bool = False) -> Non
         story_filename = filename + ".ni"
 
         # Save story file.
-        with open(story_filename, 'w') as f:
+        # TODO: 编码问题
+        with open(story_filename, 'w', encoding='utf-8') as f:
             f.write(source)
 
         # Create the file structure needed by Inform7.
